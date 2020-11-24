@@ -25,22 +25,40 @@ And finally, maintaining your version number`:
 
 Happy Pawning!
 -->
+This filterscript is used for NPC purposes like spawning, playing playback, recording playback, and such.
+Happy NPC-ing, brothers!
 
 ## Installation
 
-Simply install to your project:
-
+First you need to pull the branch:
 ```bash
-sampctl package install Hreesang/samp-npc-controller
+git pull https://github.com/Hreesang/samp-npc-controller.git
 ```
 
-Include in your code and begin using the library:
-
-```pawn
-#include <samp-npc-controller>
+Ensure the dependencies using sampctl:
+```bash
+sampctl package ensure
 ```
 
-## Usage
+Build the ``npc-controller.pwn`` file:
+```bash
+sampctl package build
+```
+
+Start the ``samp-server.exe`` by simply click on the file or through the command prompt:
+
+Powershell:
+```bash
+Powershell
+./samp-server.exe
+```
+
+CMD
+```bash
+samp-server.exe
+```
+
+## Commands
 
 <!--
 Write your code documentation or examples here. If your library is documented in
@@ -48,16 +66,13 @@ the source code, direct users there. If not, list your API and describe it well
 in this section. If your library is passive and has no API, simply omit this
 section.
 -->
+Here are the commands for this filterscript:
 
-## Testing
+**/anim**
+> Apply an animation to your player.
 
-<!--
-Depending on whether your package is tested via in-game "demo tests" or
-y_testing unit-tests, you should indicate to readers what to expect below here.
--->
+**/recording or /rec**
+> Show recording options.
 
-To test, simply run the package:
-
-```bash
-sampctl package run
-```
+**/npc**
+> Show NPC Controller options.
