@@ -1,4 +1,7 @@
+//
 #define FILTERSCRIPT
+
+//
 #include <a_samp>
 #include <crashdetect>
 #include <sscanf2>
@@ -7,15 +10,14 @@
 #include <izcmd>
 #include <formatex>
 
+//
 #define COLOR_TOMATO                    0xFF6347FF
 #define COLOR_WHITE                     0xFFFFFFFF
 #define C_TOMATO                        "{FF6347}"
 #define C_WHITE                         "{FFFFFF}"
 
-#define RECORDING_FILE_DIR              ""
-
-#if defined FILTERSCRIPT
-static
+//
+static 
     bool:gNPCFromFS[MAX_PLAYERS];
 
 stock hk_FCNPC_Create(const name[])
@@ -30,6 +32,7 @@ stock hk_FCNPC_Create(const name[])
 
     return npcid;
 }
+
 #if defined _ALS_FCNPC_Create
     #undef FCNPC_Create
 #else
@@ -37,6 +40,7 @@ stock hk_FCNPC_Create(const name[])
 #endif
 #define FCNPC_Create hk_FCNPC_Create
 
+//
 public OnFilterScriptExit()
 {
     for(new i = 0; i < MAX_PLAYERS; i++)
@@ -49,19 +53,22 @@ public OnFilterScriptExit()
     }
     return 1;
 }
-#endif
 
-new
-    gLoadedNPCs = 0,
-    bool:gPlayerRecording[MAX_PLAYERS] = {false, ...},
-    bool:gNPCLoadRecording[MAX_PLAYERS] = {false, ...},
-    gNPCLoadRecordingFile[MAX_PLAYERS][32],
-    bool:gNPCStartingPlayback[MAX_PLAYERS] = {false, ...},
-    bool:gNPCStartingPlaybackLoop[MAX_PLAYERS] = {false, ...},
+public OnFilterScriptInit()
+{
+    print("\n");
+    print(" |=============================|");
+    print(" |                             |");
+    print(" |    NPC Controller 1.0.0     |");
+    print(" |         by Hreesang         |");
+    print(" |   /anim, /(rec)ord, /npc    |");
+    print(" |                             |");
+    print(" |=============================|");
+    print("\n");
+    return 1;
+}
 
-    bool:gPlayerNPCLabelShown[MAX_PLAYERS] = {false, ...},
-    Text3D:gPlayerNPCLabel[MAX_PLAYERS][MAX_PLAYERS] = {{Text3D:INVALID_STREAMER_ID, ...}, ...};
-
+//
 stock IsValidSkin(skinid)
 {
     if(!(0 <= skinid <= 311) || skinid == 74)
@@ -71,6 +78,20 @@ stock IsValidSkin(skinid)
     return true;
 }
 
+//
+new
+    gLoadedNPCs = 0,
+
+    gNPC_CurPlaybackFile[MAX_PLAYERS][32],
+    bool:gPlayerRecording[MAX_PLAYERS] = {false, ...},
+    bool:gNPCLoadingRecord[MAX_PLAYERS] = {false, ...},
+    bool:gNPCStartingPlayback[MAX_PLAYERS] = {false, ...},
+    bool:gNPCStartingPlaybackLoop[MAX_PLAYERS] = {false, ...},
+
+    bool:gPlayerNPCLabelShown[MAX_PLAYERS] = {false, ...},
+    Text3D:gPlayerNPCLabel[MAX_PLAYERS][MAX_PLAYERS] = {{Text3D:INVALID_STREAMER_ID, ...}, ...};
+
+//
 public OnPlayerConnect(playerid)
 {
     gPlayerRecording[playerid] =
@@ -84,9 +105,14 @@ public OnPlayerDisconnect(playerid, reason)
     {
         StopRecordingPlayerData(playerid);
     }
+
+    if(gNPCLoadingRecord[playerid] || gNPCStartingPlayback[playerid])
+    {
+        FCNPC_StopPlayingPlayback(playerid);
+    }
     
-    gNPCLoadRecording[playerid] = false;
-    gNPCLoadRecordingFile[playerid][0] = EOS;
+    gNPCLoadingRecord[playerid] = false;
+    gNPC_CurPlaybackFile[playerid][0] = EOS;
     for(new i = 0; i < MAX_PLAYERS; i++)
     {
         if(IsValidDynamic3DTextLabel(gPlayerNPCLabel[playerid][i]))
@@ -107,16 +133,12 @@ public OnPlayerDisconnect(playerid, reason)
     return 1;
 }
 
-CMD:rec(playerid, params[])
-{
-    return cmd_record(playerid, params);
-}
-
+//
 public FCNPC_OnFinishPlayback(npcid)
 {
-    if(gNPCLoadRecording[npcid])
+    if(gNPCLoadingRecord[npcid])
     {
-        gNPCLoadRecording[npcid] = false;
+        gNPCLoadingRecord[npcid] = false;
         FCNPC_Destroy(npcid);
     }
 
@@ -124,7 +146,7 @@ public FCNPC_OnFinishPlayback(npcid)
     {
         if(gNPCStartingPlaybackLoop[npcid])
         {
-            FCNPC_StartPlayingPlayback(npcid, gNPCLoadRecordingFile[npcid]);
+            FCNPC_StartPlayingPlayback(npcid, gNPC_CurPlaybackFile[npcid]);
         }
         else
         {
@@ -137,6 +159,12 @@ public FCNPC_OnFinishPlayback(npcid)
         }
     }
     return 1;
+}
+
+//
+CMD:rec(playerid, params[])
+{
+    return cmd_record(playerid, params);
 }
 
 CMD:record(playerid, option[])
@@ -179,17 +207,21 @@ CMD:record(playerid, option[])
         }
 
         gPlayerRecording[playerid] = true;
-        format(params, sizeof(params), ""RECORDING_FILE_DIR"%s", params);
 
         if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER)
         {
             StartRecordingPlayerData(playerid, PLAYER_RECORDING_TYPE_DRIVER, params);
-            SendClientMessage(playerid, COLOR_TOMATO, "[ ! ] "C_WHITE"Recording playback has been started: "C_TOMATO"PLAYER_RECORDING_TYPE_DRIVER.");
+            SendClientMessage(playerid, COLOR_TOMATO, "[ ! ] "C_WHITE"Recording playback has been started: "C_TOMATO"PLAYER_RECORDING_TYPE_DRIVER");
+        }
+        else if(GetPlayerState(playerid) == PLAYER_STATE_ONFOOT)
+        {
+            StartRecordingPlayerData(playerid, PLAYER_RECORDING_TYPE_ONFOOT, params);
+            SendClientMessage(playerid, COLOR_TOMATO, "[ ! ] "C_WHITE"Recording playback has been started: "C_TOMATO"PLAYER_RECORDING_TYPE_ONFOOT");
         }
         else
         {
-            StartRecordingPlayerData(playerid, PLAYER_RECORDING_TYPE_ONFOOT, params);
-            SendClientMessage(playerid, COLOR_TOMATO, "[ ! ] "C_WHITE"Recording playback has been started: "C_TOMATO"PLAYER_RECORDING_TYPE_ONFOOT.");
+            StartRecordingPlayerData(playerid, PLAYER_RECORDING_TYPE_NONE, params);
+            SendClientMessage(playerid, COLOR_TOMATO, "[ ! ] "C_WHITE"Recording playback has been started: "C_TOMATO"PLAYER_RECORDING_TYPE_NONE");
         }
 
         new
@@ -243,7 +275,7 @@ CMD:record(playerid, option[])
         new
             file_full_name[128];
         
-        format(file_full_name, sizeof(file_full_name), ""RECORDING_FILE_DIR"%s.rec", file_name);
+        format(file_full_name, sizeof(file_full_name), "%s.rec", file_name);
         if(!fexist(file_full_name))
         {
             SendClientMessage(playerid, COLOR_TOMATO, "You can't select an invalid recording file.");
@@ -265,15 +297,15 @@ CMD:record(playerid, option[])
             FCNPC_PutInVehicle(npcid, vehicleid, 0);
         }
         
-        FCNPC_SetPlayingPlaybackPath(npcid, "scriptfiles/"RECORDING_FILE_DIR"");
+        FCNPC_SetPlayingPlaybackPath(npcid, "scriptfiles/");
         FCNPC_StartPlayingPlayback(npcid, file_name);
-        format(gNPCLoadRecordingFile[npcid], sizeof(gNPCLoadRecordingFile[]), file_name);
+        format(gNPC_CurPlaybackFile[npcid], sizeof(gNPC_CurPlaybackFile[]), file_name);
         for(new i = GetPlayerPoolSize(); i >= 0; i --)
         {
             UpdatePlayerNPCLabel(i);
         }
 
-        gNPCLoadRecording[npcid] = true;
+        gNPCLoadingRecord[npcid] = true;
 
         format(file_full_name, sizeof(file_full_name), "[ ! ] "C_WHITE"NPC "C_TOMATO"%s"C_WHITE" is loading recording file "C_TOMATO"%s.rec", npc_name, file_name);
         SendClientMessage(playerid, COLOR_TOMATO, file_full_name);
@@ -285,6 +317,7 @@ CMD:record(playerid, option[])
     return 1;
 }
 
+//
 UpdatePlayerNPCLabel(playerid)
 {
     if(
@@ -310,9 +343,9 @@ UpdatePlayerNPCLabel(playerid)
             continue;
         }
 
-        if(!isnull(gNPCLoadRecordingFile[i]))
+        if(!isnull(gNPC_CurPlaybackFile[i]))
         {
-            format(string, sizeof(string), "NPCID %i\nPlayback: %s.rec", i, gNPCLoadRecordingFile[i]);
+            format(string, sizeof(string), "NPCID %i\nPlayback: %s.rec", i, gNPC_CurPlaybackFile[i]);
         }
         else
         {
@@ -332,6 +365,7 @@ UpdatePlayerNPCLabel(playerid)
     }
 }
 
+//
 CMD:npc(playerid, params[])
 {
     new
@@ -353,13 +387,28 @@ CMD:npc(playerid, params[])
         {
             gPlayerNPCLabelShown[playerid] = false;
             SendClientMessage(playerid, COLOR_TOMATO, "[ ! ] "C_WHITE"NPC dl has been disabled.");
+
+            for(new i = GetPlayerPoolSize(); i >= 0; i--)
+            {
+                if(!FCNPC_IsValid(i))
+                {
+                    continue;
+                }
+
+                if(IsValidDynamic3DTextLabel(gPlayerNPCLabel[playerid][i]))
+                {
+                    DestroyDynamic3DTextLabel(gPlayerNPCLabel[playerid][i]);
+                }
+                gPlayerNPCLabel[playerid][i] = Text3D:INVALID_STREAMER_ID;
+            }
         }
         else
         {
             gPlayerNPCLabelShown[playerid] = true;
             SendClientMessage(playerid, COLOR_TOMATO, "[ ! ] "C_WHITE"NPC dl has been enabled.");
+
+            UpdatePlayerNPCLabel(playerid);
         }
-        UpdatePlayerNPCLabel(playerid);
     }
     else if(!strcmp(option, "create", true))
     {
@@ -425,7 +474,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -455,7 +504,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -498,9 +547,9 @@ CMD:npc(playerid, params[])
         {
             FCNPC_PutInVehicle(npcid, vehicleid, 0);
         }
-        FCNPC_SetPlayingPlaybackPath(npcid, "scriptfiles/"RECORDING_FILE_DIR"");
+        FCNPC_SetPlayingPlaybackPath(npcid, "scriptfiles/");
         FCNPC_StartPlayingPlayback(npcid, file_name);
-        format(gNPCLoadRecordingFile[npcid], sizeof(gNPCLoadRecordingFile[]), file_name);
+        format(gNPC_CurPlaybackFile[npcid], sizeof(gNPC_CurPlaybackFile[]), file_name);
         for(new i = GetPlayerPoolSize(); i >= 0; i --)
         {
             UpdatePlayerNPCLabel(i);
@@ -528,7 +577,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -540,13 +589,13 @@ CMD:npc(playerid, params[])
 
         new
             string[144];
-        format(string, sizeof(string), "[ ! ] "C_WHITE"NPC ID %i has been stopped from playing "C_TOMATO"%s.rec", npcid, gNPCLoadRecordingFile[npcid]);
+        format(string, sizeof(string), "[ ! ] "C_WHITE"NPC ID %i has been stopped from playing "C_TOMATO"%s.rec", npcid, gNPC_CurPlaybackFile[npcid]);
         SendClientMessage(playerid, COLOR_TOMATO, string);
 
         FCNPC_PausePlayingPlayback(npcid);
         FCNPC_StopPlayingPlayback(npcid);
         gNPCStartingPlayback[npcid] = false;
-        gNPCLoadRecordingFile[npcid][0] = EOS;
+        gNPC_CurPlaybackFile[npcid][0] = EOS;
 
         for(new i = GetPlayerPoolSize(); i >= 0; i --)
         {
@@ -568,7 +617,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -582,7 +631,7 @@ CMD:npc(playerid, params[])
 
         new
             string[144];
-        format(string, sizeof(string), "[ ! ] "C_WHITE"NPC ID %i has been paused from playing "C_TOMATO"%s.rec", npcid, gNPCLoadRecordingFile[npcid]);
+        format(string, sizeof(string), "[ ! ] "C_WHITE"NPC ID %i has been paused from playing "C_TOMATO"%s.rec", npcid, gNPC_CurPlaybackFile[npcid]);
         SendClientMessage(playerid, COLOR_TOMATO, string);
     }
     else if(!strcmp(option, "resumepb", true))
@@ -600,7 +649,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -614,7 +663,7 @@ CMD:npc(playerid, params[])
 
         new
             string[144];
-        format(string, sizeof(string), "[ ! ] "C_WHITE"NPC ID %i has been resumed playing "C_TOMATO"%s.rec", npcid, gNPCLoadRecordingFile[npcid]);
+        format(string, sizeof(string), "[ ! ] "C_WHITE"NPC ID %i has been resumed playing "C_TOMATO"%s.rec", npcid, gNPC_CurPlaybackFile[npcid]);
         SendClientMessage(playerid, COLOR_TOMATO, string);
     }
     else if(!strcmp(option, "anim", true))
@@ -640,7 +689,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -676,7 +725,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -705,7 +754,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -739,7 +788,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -772,7 +821,7 @@ CMD:npc(playerid, params[])
             return SendClientMessage(playerid, COLOR_TOMATO,  "That's an invalid NPC index.");
         }
 
-        if(gNPCLoadRecording[npcid])
+        if(gNPCLoadingRecord[npcid])
         {
             return SendClientMessage(playerid, COLOR_TOMATO, "You can't select NPC loaded from '/record'.");
         }
@@ -797,5 +846,52 @@ CMD:npc(playerid, params[])
     {
         SendClientMessage(playerid, COLOR_TOMATO, "Invalid parameters!");
     }
+    return 1;
+}
+
+//
+CMD:anim(playerid, const params[])
+{
+    new
+        animlib[32],
+        animname[32],
+        Float:fDelta,
+        loop,
+        lockx,
+        locky,
+        freeze,
+        time;
+
+    if(sscanf(params, "s[32]s[32]fiiiii", animlib, animname, fDelta, loop, lockx, locky, freeze, time))
+    {
+        return SendClientMessage(playerid, COLOR_TOMATO, "USAGE: /anim [library] [name] [delta (4.0)] [loop] [lockx] [locky] [freeze] [time]");
+    }
+
+    ApplyAnimation(
+        playerid, 
+        animlib, 
+        animname, 
+        fDelta, 
+        loop, 
+        lockx, 
+        locky, 
+        freeze, 
+        time, 
+        1);
+
+    new
+        string[144];
+
+    format(string, sizeof(string), "You have applied an animation: "C_TOMATO"%s, %s, %.1f, %i, %i, %i, %i, %i",
+        animlib,
+        animname,
+        fDelta,
+        loop,
+        lockx,
+        locky,
+        freeze,
+        time);
+    SendClientMessage(playerid, COLOR_WHITE, string);
+
     return 1;
 }

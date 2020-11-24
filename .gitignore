@@ -4,6 +4,7 @@
 
 # Compiled Bytecode, precompiled output and assembly
 *.amx
+!gamemodes/*.amx
 *.lst
 *.asm
 
